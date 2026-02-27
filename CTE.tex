@@ -1,0 +1,534 @@
+\pdfoutput=1
+
+\documentclass[english,11pt]{article}
+\include{macros}
+
+\newcommand{\FF}{\mathbb{F}}
+\newcommand{\de}{\mathrm{d}}
+\newcommand{\Sb}{\mathbf{S}}
+\newcommand{\Ecr}{\mathscr{E}}
+\newcommand{\Bcr}{\mathscr{B}}
+\newcommand{\Ccr}{\mathscr{C}}
+\newcommand{\Pcr}{\mathscr{P}}
+\newcommand{\Ocr}{\mathscr{O}}
+\newcommand{\Fcr}{\mathscr{F}}
+\usepackage[cjk]{kotex}
+\usepackage{etoc}
+\usepackage{authblk}
+\etocdepthtag.toc{mtchapter}
+\etocsettagdepth{mtchapter}{subsection}
+\etocsettagdepth{mtappendix}{none}
+\setlist[enumerate,1]{label=\arabic*., leftmargin=2em, labelsep=0.5em}
+
+
+% \usepackage[fontsize=12pt]{scrextend}
+% \renewcommand{\baselinestretch}{1.7}
+
+
+% \usepackage[fontsize=11pt]{scrextend}
+% \renewcommand{\baselinestretch}{1.5}
+
+\begin{document}
+
+
+\title{\Large Optimal Estimation of Continuous Treatment Effects with Kernel Ridge Regression}%\blfootnote{Author names are sorted alphabetically.}
+
+
+
+
+\author[1]{Seok-Jin Kim}
+\author[2]{Kaizheng Wang}
+\affil[1]{Department of IEOR, Columbia University}
+\affil[2]{Department of IEOR and Data Science Institute, Columbia University}
+
+
+\date{This version: \today}
+
+\maketitle
+
+\begin{abstract}
+We study the problem of estimating the treatment effect function of a continuous treatment, which maps each treatment value to a population-averaged outcome. A central challenge in this setting is confounding: treatment assignment often depends on covariates, creating selection bias that makes direct regression of the response on treatment unreliable. To address this issue, we propose a two-stage kernel ridge regression method. In the first stage, we learn a model for the response as a function of both treatment and covariates; in the second stage, we use this model to construct pseudo-outcomes that correct for distribution shift, and then fit a second model to estimate the treatment effect. Although the response varies with both treatment and covariates, the induced effect function obtained by averaging over covariates is typically much simpler, and our estimator adapts to this structure.
+Furthermore, we introduce a fully data-driven model selection procedure that achieves provable adaptivity to both the unknown degree of overlap and the regularity (eigenvalue decay) of the underlying kernel.
+\end{abstract}
+
+\section{Introduction}
+
+Estimating the causal effects of continuous treatments—such as drug dosages, training intensity, or varying policy levels—is a fundamental challenge in causal inference \citep{ishak2015simulation,kennedy2017non,colangelo2025double,zhang2025doubly}. The primary estimand of interest is the Treatment Effect Function (TEF), which maps each treatment value to the population-averaged outcome. A central difficulty in observational settings is confounding (or distribution shift): treatment assignment often depends on complex, high-dimensional covariates. Consequently, direct regression of the outcome on the treatment yields biased estimates of the TEF.
+
+State-of-the-art nonparametric approaches typically address this via two-stage ``debiasing'' procedures, which involve estimating nuisance components—specifically the conditional outcome mean and treatment density—to construct pseudo-outcomes \citep{kennedy2017non,colangelo2025double,bonvini2022fast}. However, existing theory for these methods relies heavily on Hölder smoothness assumptions and requires estimating the conditional treatment density (generalized propensity score). Guaranteeing convergence in this setting demands strong sup-norm error bounds, which are notoriously difficult to satisfy when covariates are high-dimensional, discrete, or sparse.
+
+In this work, we propose a kernel-based framework that overcomes these limitations. By leveraging the flexibility of Reproducing Kernel Hilbert Spaces (RKHS) \citep{scholkopf2002learning}, our method accommodates rich nonlinear interactions while naturally capturing the smoothness structures inherent in causal problems. Unlike prior debiasing methods, our approach avoids the instability associated with explicit conditional density estimation in high dimensions. Crucially, we establish that our estimator achieves a convergence rate that adapts to the intrinsic complexity of the TEF. Remarkably, this adaptivity holds provided that the nuisance model is well-specified, without requiring any explicit convergence rates on the nuisance estimation error. Below are our main contributions:
+
+\begin{itemize}
+    \item \textbf{Methodology:} We propose a two-stage kernel ridge regression (KRR) estimator. The first stage learns the conditional outcome surface, and the second stage projects the estimated pseudo-outcomes onto the treatment space. To ensure practical applicability, we develop a fully data-driven model selection procedure that eliminates the need for manual tuning of regularizers.
+
+    \item \textbf{Theory:} We establish minimax-optimal error bounds for our estimator. We prove that our method adapts to unknown structural parameters, specifically the intrinsic overlap of the data and the spectral decay of the kernel. This demonstrates that KRR can effectively exploit the lower complexity of the TEF compared to the full nuisance model.
+\end{itemize}
+
+\paragraph{Related work.}
+
+Early studies on continuous treatment effects focused primarily on parametric models \citep{robins2000marginal, laan2003unified, diaz2013targeted}, while recent advances have shifted toward flexible nonparametric estimation \citep{kennedy2017non, semenova2021debiased,bonvini2022fast,colangelo2025double,takatsu2025debiased}. The dominant paradigm in this literature combines orthogonalization (debiasing) with Hölder function classes. However, these methods rely on the estimation of the conditional treatment density, requiring stringent sup-norm convergence rates that degrade rapidly as the covariate dimension increases.
+
+RKHS-based methods offer a powerful alternative for structural adaptation in causal inference \citep{nie2021quasi,kim2021statistical,mou2023kernel,singh2024kernel,hirshberg2021augmented,kim2025transfer}. Most relevant to our work, \citet{singh2022generalized,singh2024kernel} analyze continuous treatment effect estimators using tensor-product kernels under source conditions on the response function. However, it remains unclear whether their rates can adapt to the complexity of the treatment effect function. In contrast, we consider general kernels and dispense with the source condition requirement, thereby offering broader applicability.
+
+While \citet{robins2008higher} and \citet{bonvini2022fast} demonstrated that Higher Order Influence Functions (HOIFs) can achieve faster rates for binary and continuous treatments, respectively, their application in the continuous setting faces significant hurdles. Currently, fast rates with HOIFs are limited to Hölder spaces and rely on restrictive assumptions, such as covariate densities being bounded away from zero and infinity. Moreover, the methodology is computationally demanding, requiring the projection of functions onto finite subspaces and the computation of U-statistics.
+
+Finally, the concept of two-stage regression has appeared in semi-supervised learning with auxiliary covariates \citep{liu2023augmented,XWa24}. However, these works address fundamentally different problems and do not analyze TEF estimation or the adaptation phenomena that arise in continuous treatment settings.
+
+\paragraph{Notation.}
+The constants $c_1, c_2, C_1, C_2, \dots$ may differ from line to line. We use the symbol $[n]$ as a shorthand for $\{ 1, 2, \dots, n \}$ and $| \cdot |$ to denote the absolute value of a real number or the cardinality of a set. For nonnegative sequences $\{ a_n \}_{n=1}^{\infty}$ and $\{ b_n \}_{n=1}^{\infty}$, we write $a_n \lesssim b_n$ or $a_n = \cO(b_n)$ if there exists a positive constant $C$ such that $a_n \leq C b_n$ for all $n$. We use $\widetilde{\cO}$ to hide polylogarithmic factors. In addition, we write $a_n \asymp b_n$ if $a_n \lesssim b_n$ and $b_n \lesssim a_n$. For a bounded linear operator $\bA$, we use $\| \bA \|_{\mathrm{op}}$ to refer to its operator norm. For any $\bu$ and $\bv$ in a Hilbert space $\HH$, their inner and outer products are denoted by $\langle \bu, \bv \rangle_{\HH}$ and $\bu \otimes \bv$, respectively. We use $\cN(\bmu, \bSigma)$ to represent the Gaussian distribution with mean $\bmu$ and covariance matrix $\bSigma$, and $\cU (S)$ for the uniform distribution on a set \(S\).
+
+\section{Problem Setup}\label{section:problem-setup}
+
+\subsection{Formulation and Objective}
+
+Let $\cX$ denote the covariate space and $\cA$ denote the domain of continuous treatments (e.g., drug dosage).
+We assume a joint distribution $\cP_{X,A}$ on the product space $\cZ = \cX \times \cA$, and $\cP_X$ denotes the marginal distribution of the covariates.
+Adopting the potential outcomes framework \citep{robins2000marginal}, we assume that for each subject with covariates $x \in \cX$ and any treatment level $a \in \cA$, there exists a corresponding random potential outcome $Y^a(x)$.
+We observe a dataset $\cD = \{(x_i, a_i, y_i)\}_{i=1}^n$ consisting of $n$ i.i.d.\ samples, where $z_i := (x_i, a_i) \sim \cP_{X, A}$ and the realized outcome $y_i$ satisfies $y_i = Y^{a_i}(x_i)$.
+
+The conditional mean response given covariates and treatment is defined as $f^\star(x, a) = \EE[Y^a(x)]$. Our target estimand is the \emph{Treatment Effect Function (TEF)},
+\begin{equation*}
+    h^\star(a) = \EE_{x \sim \cP_X} [Y^a(x)] = \EE_{x \sim \cP_X} [f^\star(x, a)],
+%\label{eqn-h}
+\end{equation*}
+which maps each treatment value to the population-averaged outcome.
+
+A fundamental challenge in this setting is confounding (or selection bias). In observational data, treatment assignment typically depends on covariates; consequently, the conditional distribution of covariates given treatment, denoted by $\cP_{X|A=a}$, varies with $a$ and generally differs from the marginal distribution $\cP_X$.
+Consider the function learned by directly regressing the observed outcome $y$ on the treatment $a$:
+\begin{equation*}
+g(a) = \EE [Y \mid A=a] = \EE_{x \sim \cP_{X|A=a}} [f^\star(x, a)].
+\end{equation*}
+Because the integration measure $\cP_{X|A=a}$ changes with $a$, the function $g(a)$ conflates the true treatment effect with the effect of the shifting covariate distribution. As a result, $g(a)$ generally differs from $h^\star(a)$, and recovering $h^\star$ necessitates adjusting for this distribution shift.
+
+Our objective is to construct an estimator $\hat{h}$ that minimizes the Mean Integrated Squared Error (MISE) with respect to a reference distribution $\cP_{\operatorname{ref}}$ defined on $\cA$ \(\ddag\):
+\begin{equation}\label{eq:mise}
+    \mathcal{E}(\hat{h}) := \int_{\mathcal{A}} \left( \hat{h}(a) - h^\star(a) \right)^2 \mathrm{d}\cP_{\operatorname{ref}}(a).
+\end{equation}
+The reference distribution $\cP_{\operatorname{ref}}$ is user-specified and reflects the region of interest for evaluation.
+
+\subsection{RKHS Framework}
+
+We assume that both the conditional response function $f^\star$ and the treatment effect function $h^\star$ reside in RKHSs, denoted by $\mathcal{F}$ and $\mathcal{H}$, defined on domains $\mathcal{Z}$ and $\mathcal{A}$, respectively.
+Let $K_{\mathcal{F}}$ and $K_{\mathcal{H}}$ be their associated positive semidefinite kernels.
+By standard theory \citep{aronszajn1950theory}, there exist Hilbert spaces \(\FF\) and \(\HH\), along with feature maps $\psi: \cZ \to \FF$ and $\phi: \cA \to \HH$, satisfying the reproducing properties: \(\langle \psi(z), \psi(z')\rangle_{\FF} = K_\cF(z,z')\) and \(\langle \phi(a), \phi(a')\rangle_{\HH} = K_\cH(a,a')\).
+Accordingly, the hypothesis spaces are defined as:
+\begin{align*}
+    \mathcal{F} &= \{ f_\theta(\cdot) = \langle \psi(\cdot), \theta \rangle_{\FF} \mid \theta \in \FF \}, \\
+    \mathcal{H} &= \{ h_\eta(\cdot) = \langle \phi(\cdot), \eta \rangle_{\HH} \mid \eta \in \HH \}.
+\end{align*}
+
+A central motivation for our framework is the observation that $h^\star$, being a marginal average of $f^\star$ over the covariate distribution $\cX$, typically exhibits lower structural complexity than the nuisance component $f^\star$ since it is a function of lower dimension.
+Our method leverages this distinction through flexible modeling. To illustrate, consider the case where $\cZ \subset \RR^d$ and $\cA \subset \RR^p$ are bounded regular domains.
+
+\begin{itemize}
+    \item \textit{Sobolev smoothness.} The standard Sobolev space $H^\beta(\cZ)$ (with $\beta > d / 2$) and the mixed Sobolev space $H^1_{\mathrm{mix}}(\cZ)$ are known to admit RKHS structures \citep{doumeche2025fast,zhang2023optimality,dick2007construction,kuhn2015approximation,suzuki2018adaptivity}.
+    If $f^\star \in H^\beta(\cZ)$ or $f^{\star} \in H^1_{\mathrm{mix}}(\cZ)$, the target function inherits smoothness such that $h^\star \in H^\beta(\cA)$ or $h^\star \in H^1(\cA)$, respectively.
+    Since the treatment dimension $p$ is typically much smaller than the covariate dimension $d$ ($p \ll d$), estimating $h^\star$ directly in $\mathcal{H}$ can yield statistically more efficient rates than estimating $f^\star$ in $\mathcal{F}$.
+
+    \item \textit{High-dimensional covariates.} 
+    Our framework allows for modeling $\mathcal{F}$ using kernels designed for high-dimensional data, such as Neural Tangent Kernels (NTK) \citep{ghorbani2021linearized,bietti2020deep} or inner product kernels \citep{mei2022generalization,liang2020just,mei2021learning}, to capture complex nuisance interactions.
+    Simultaneously, one can model the simpler dose-response curve in $\mathcal{H}$ using a standard smooth kernel (e.g., Matérn), thereby decoupling the complexity of the nuisance from the target.
+\end{itemize}
+
+
+\subsection{Assumptions}
+
+We posit the following standard assumptions to facilitate our theoretical analysis.
+
+\begin{assumption}[Identification]\label{ass:id}
+    (i) Consistency: $y_i = Y^{a_i} (x_i)$. (ii) No unmeasured confounding: conditional on the covariates $x_i$, the potential outcomes $\{Y^a\}_{a \in \cA}$ are independent of the treatment assignment $a_i$.
+\end{assumption}
+
+\begin{assumption}[Sub-Gaussian Noise]\label{ass:noise}
+    The noise $\varepsilon_i = y_i - f^\star(x_i, a_i)$ is $\sigma$-sub-Gaussian given $(x_i, a_i)$, i.e., $\EE[e^{\lambda \varepsilon_i} \mid x_i, a_i] \le e^{\lambda^2 \sigma^2 / 2}$ for all $\lambda \in \RR$.
+    We assume $\sigma$ is bounded by an absolute constant.
+\end{assumption}
+
+\begin{assumption}[Boundedness]\label{ass:bounded}
+    The kernels are uniformly bounded by a constant $\xi$: $\sup_{z \in \cZ} K_\cF(z, z) \le \xi$ and $\sup_{a \in \cA} K_\cH(a, a) \le \xi$. Additionally, we assume $\|h^\star\|_\cH$ is bounded by a constant.
+\end{assumption}
+
+Assumptions~\ref{ass:id} and \ref{ass:noise} are standard in the causal inference literature \citep{bonvini2022fast,kennedy2017non,kunzel2019metalearners,curth2021nonparametric}.
+The boundedness of the kernels in Assumption~\ref{ass:bounded} is common in the analysis of kernel methods \citep{wainwright2019high,singh2024kernel}. Notably, unlike many existing results in nonparametric regression, we \emph{do not} assume that the norm of the full conditional response, $\|f^\star\|_\cF$, is bounded by a constant. Instead, we allow it to grow with $n$, and our error bounds explicitly characterize the dependence on this quantity. This relaxes the requirement that the complex nuisance function $f^\star$ must lie strictly within a fixed ball of the RKHS.
+
+\section{Methodology}\label{section: methodology}
+
+This section presents our methodology.
+Section~\ref{subsection: estimation algorithm} introduces the two-stage KRR framework for constructing our estimator.
+Subsequently, Section~\ref{subsection: model selection algorithm} describes the data-driven procedure for selecting the regularizer for the second-stage KRR.
+
+\subsection{Estimation Procedure}\label{subsection: estimation algorithm}
+
+We propose a two-stage KRR framework designed to decouple the estimation of the complex conditional response surface $f^\star$ from the smoothing of the simpler treatment effect function $h^\star$.
+
+The procedure consists of three steps: (1) learning the full conditional mean $f^\star$ via KRR; (2) constructing ``pseudo-outcomes'' by empirically marginalizing the estimated nuisance function over the covariate distribution; and (3) regressing these pseudo-outcomes on treatment values to recover $h^\star$. A summary is provided in Algorithm~\ref{algorithm: main}.
+
+\paragraph{Step 1: Nuisance Estimation.}
+We first estimate the conditional mean function $f^\star: \cZ \to \RR$ using KRR on the joint space $\cZ = \cX \times \cA$.
+Recall that $\cD = \{(x_i, a_i, y_i)\}_{i=1}^n$ denotes the observed data.
+We solve the following optimization problem over the hypothesis space $\cF$:
+\begin{equation}\label{equation: nuisance KRR}
+	\hat{f} := \argmin_{f \in \cF} \bigg\{ \frac{1}{n}\sum_{i=1}^n (y_i - f(x_i, a_i))^2 + \lambda_0\|f\|_\cF^2 \bigg\}.
+\end{equation}
+The solution has a closed-form expression involving kernel similarities between samples $\{ K_{\cF} (z_i, z_j) \}_{1 \leq i, j \leq n}$, which is known as the kernel trick. We deliberately employ a small \textit{nuisance regularizer} $\lambda_0 \asymp n^{-1} \log n$. This choice is strategic: in the first stage, the primary objective is to minimize bias and accurately capture the conditional surface, prioritizing low approximation error over variance reduction. The smoothing of the final estimator is effectively handled in the second stage.
+
+\paragraph{Step 2: Empirical Marginalization.}
+To recover the target $h^\star(a) = \EE_{x}[f^\star(x, a)]$, we construct a synthetic dataset. We sample $n$ treatment values $\{a'_j\}_{j=1}^n$ i.i.d. from a user-specified sampling distribution $\cP_{\operatorname{samp}}$ (e.g., Uniform over $\cA$). For each $a'_j$, we compute the \emph{pseudo-outcome} $m_j$ by averaging the fitted nuisance function $\hat{f}$ over the empirical distribution of covariates:
+\begin{equation}\label{equation: pseudo-outcome}
+	m_j := \frac{1}{n} \sum_{i=1}^n \hat{f}(x_i, a'_j).
+\end{equation}
+Here, $m_j$ serves as a noisy proxy for $h^\star(a'_j)$. The sampling distribution $\cP_{\operatorname{samp}}$ allows us to probe the treatment effect function across the entire domain $\cA$, independent of the observational treatment distribution $\cP_A$.
+
+\paragraph{Step 3: Pseudo-outcome Regression.}
+Finally, we treat the constructed set $\cD' = \{(a'_j, m_j)\}_{j=1}^n$ as our dataset for the target function. We perform a second KRR in the simpler space $\cH$ to smooth the pseudo-outcomes:
+\begin{equation}\label{equation: second KRR}
+	\hat{h}_\lambda := \argmin_{h \in \cH} \bigg\{\frac{1}{n}\sum_{j=1}^n (m_j - h(a'_j))^2 + \lambda \|h\|_\cH^2 \bigg\}.
+\end{equation}
+The \textit{main regularizer} $\lambda$ controls the final smoothness of the TEF. 
+We propose a data-driven procedure to select the optimal $\lambda$ in Section~\ref{subsection: model selection algorithm}.
+
+\begin{algorithm}[h]
+	\caption{TEF Estimation via Two-Stage KRR}
+	\label{algorithm: main}
+	\begin{algorithmic}[1]
+		\REQUIRE Dataset $\cD = \{(x_i, a_i, y_i)\}_{i=1}^n$, sampling distribution $\cP_{\operatorname{samp}}$, nuisance regularizer $\lambda_0$, main regularizer \(\lambda\).
+		\STATE \textbf{Stage 1:} Compute $\hat{f}$ by solving \cref{equation: nuisance KRR}.
+		\STATE \textbf{Stage 2:} Sample query points $a'_1, \dots, a'_n \overset{\text{i.i.d.}}{\sim} \cP_{\operatorname{samp}}$.
+		\STATE Compute pseudo-outcomes: $m_j \leftarrow \frac{1}{n} \sum_{i=1}^n \hat{f}(x_i, a'_j)$ for $j=1, \dots, n$.
+		\STATE \textbf{Stage 3:} Compute $\hat{h}_\lambda$ by solving \cref{equation: second KRR} on $\{(a'_j, m_j)\}_{j=1}^n$.
+        
+		\textbf{Output} Estimator $\hat{h}_\lambda$.
+	\end{algorithmic}
+\end{algorithm}
+
+\subsection{Model Selection Procedure}\label{subsection: model selection algorithm}
+
+While the nuisance regularizer $\lambda_0$ in Algorithm~\ref{algorithm: main} follows a concrete theoretical guideline ($\lambda_0 \asymp n^{-1} \log n$), the main regularizer $\lambda$ requires careful tuning.
+Standard cross-validation is not directly applicable in this setting because the ``true labels''—the treatment effects $h^\star(a_i)$—are unobserved. Instead, we only observe noisy outcomes $y_i$ that are confounded by covariates.
+To address this challenge, we introduce a fully data-driven model selection procedure based on \textit{proxy validation}.
+The core idea is to construct a nearly unbiased (albeit noisy) ``proxy'' for the ground truth using a data splitting strategy, allowing us to estimate the generalization error of our candidate models.
+Crucially, this procedure provably adapts to unknown structural parameters without requiring manual tuning.
+
+We randomly split the dataset $\cD$ into a training set $\cD_{\text{train}}$ and a validation set $\cD_{\text{val}}$, each of size $n/2$.
+\begin{enumerate}
+    \item \textbf{Candidate Training ($\cD_{\text{train}}$):} On the training set, we run Algorithm~\ref{algorithm: main} for a grid of main regularizers $\Lambda$, generating a set of candidate estimators $\mathcal{M} = \{ \hat{h}_\lambda \mid \lambda \in \Lambda \}$.
+    \item \textbf{Proxy Construction ($\cD_{\text{val}}$):} On the validation set, we run Algorithm~\ref{algorithm: main} using a fixed, small main regularizer $\tilde{\lambda} \asymp n^{-1} \log n$. Let $\tilde{h}$ denote this proxy estimator.
+    \item \textbf{Selection:} We select the candidate $\hat{h}_\lambda \in \mathcal{M}$ that is closest to the proxy $\tilde{h}$ in terms of the $L^2(\cP_{\operatorname{ref}})$ distance. In practice, we approximate this distance by Monte Carlo integration, sampling query points from the reference distribution $\cP_{\operatorname{ref}}$.
+\end{enumerate}
+
+The formal procedure is detailed in Algorithm~\ref{algorithm: model selection}.
+
+\begin{algorithm}[h]
+	\caption{Data-Driven Model Selection for TEF}
+	\label{algorithm: model selection}
+	\begin{algorithmic}[1]
+		\REQUIRE Dataset $\cD$, reference distribution $\cP_{\operatorname{ref}}$, candidate grid $\Lambda$, nuisance regularizer $\lambda_0$, number of Monte Carlo samples $M$.
+		\STATE Randomly split $\cD$ into $\cD_{\text{train}}$ and $\cD_{\text{val}}$ (sizes $n/2$).
+		\STATE \textbf{Train Candidates:} Run Algorithm~\ref{algorithm: main} on $\cD_{\text{train}}$ with each main regularizer $\lambda \in \Lambda$ to obtain $\{\hat{h}_\lambda\}_{\lambda \in \Lambda}$.
+        \STATE \textbf{Train Proxy:} Run Algorithm~\ref{algorithm: main} on $\cD_{\text{val}}$ with main regularizer $\tilde{\lambda} \asymp n^{-1} \log n$ to obtain $\tilde{h}$.
+		\STATE \textbf{Evaluate:} Sample test points $\tilde{a}_1, \dots, \tilde{a}_M \overset{\text{i.i.d.}}{\sim} \cP_{\operatorname{ref}}$.
+		\STATE Select $\hat{\lambda}$ by minimizing the distance to the proxy:
+		\begin{align*}
+			\hat{\lambda} := \argmin_{\lambda \in \Lambda} \sum_{k=1}^{M} \left( \hat{h}_\lambda(\tilde{a}_k) - \tilde{h}(\tilde{a}_k) \right)^2.
+		\end{align*}
+        \textbf{Output} Selected estimator $\hat{h}_{\hat{\lambda}}$.
+	\end{algorithmic}
+\end{algorithm}
+
+\section{Theoretical Analysis}\label{section: theory}
+
+This section establishes theoretical guarantees for Algorithm~\ref{algorithm: main}. We first introduce a generalized notion of overlap tailored to our setting. We then derive upper bounds on the MISE that adapt to the spectral decay of the target kernel $K_\cH$, followed by minimax lower bounds showing that our estimator is optimal with respect to both the sample size $n$ and the overlap parameter $\gamma$.
+
+\subsection{Relative Overlap and Effective Sample Size}
+
+Standard causal inference frameworks typically assume ``positivity'' (or ``overlap''), requiring the conditional treatment density to be uniformly bounded away from zero. We introduce a more flexible condition, \emph{Relative Overlap}, which quantifies overlap specifically with respect to the user-specified reference distribution $\cP_{\operatorname{ref}}$.
+
+\begin{definition}[Relative Overlap]\label{definition; relative overlap}
+    Let $\cP_{A|X=x}$ denote the conditional distribution of treatment given covariates $x$. We say the data distribution satisfies \emph{relative overlap of degree $\gamma \in (0, 1]$} with respect to a reference measure $\cP_{\operatorname{ref}}$ if the following bound holds for all $x \in \cX$:
+    \begin{align*}
+        \frac{\mathrm{d} \cP_{\operatorname{ref}}}{\mathrm{d} \cP_{A|X=x}} \le \frac{1}{\gamma} \quad \text{almost everywhere on } \cA.
+    \end{align*}
+\end{definition}
+
+Intuitively, $\gamma$ represents the minimum density of the observed treatments relative to the target distribution. A smaller $\gamma$ implies weaker overlap. Based on this, we define the \emph{effective sample size} as:
+\[
+    n_{\operatorname{eff}} := \gamma n.
+\]
+This quantity reflects the effective number of samples available for learning the target function $h^\star$ after accounting for the distribution shift.
+
+\subsection{Upper Bound Analysis}
+
+To state our convergence rates, we characterize the complexity of the target RKHS $\cH$ via the spectral decay of its kernel integral operator.
+Define the second moment operator associated with kernel $K_{\cH}$ and reference distribution \(\cP_{\operatorname{ref}}\) as
+\begin{align*}
+    \bSigma_{\operatorname{ref}} := \EE_{a \sim \cP_{\operatorname{ref}}}[\phi(a)\otimes \phi(a)].
+\end{align*}
+The following definition summarizes the spectral decay regimes considered in our analysis.
+\begin{definition}[Spectral Decay]\label{def:spectral}
+    Let $\rho_1 \ge \rho_2 \ge \dots$ denote the eigenvalues of $\bSigma_{\operatorname{ref}}$. We consider three commonly studied decay regimes:
+    \begin{enumerate}[label=(\alph*), leftmargin=*]
+        \item \textbf{Polynomial:} $\rho_j \lesssim j^{-2\ell}$ for some $\ell > 1/2$ (e.g., Sobolev spaces).
+        \item \textbf{Exponential:} $\rho_j \lesssim \exp(-c j)$ for some $c > 0$ (e.g., Gaussian kernel).
+        \item \textbf{Finite Rank:} $\rho_j = 0$ for all $j > D$ (e.g., Linear kernels).
+    \end{enumerate}
+    We further define the \emph{effective dimension} at scale $\lambda$ as
+    \begin{align*}
+        \Gamma(\lambda) := \Tr [ (\bSigma_{\operatorname{ref}} + \lambda \Ib)^{-1} \bSigma_{\operatorname{ref}} ]
+    = \sum_{j=1}^\infty \frac{\rho_j}{\rho_j + \lambda}.
+    \end{align*}
+\end{definition}
+
+Our main result establishes a finite-sample bound for the proposed estimator.
+
+\begin{theorem}[MISE Upper Bound]\label{theorem; MISE}
+    Suppose we run Algorithm~\ref{algorithm: main} with nuisance regularizer $\lambda_0 \asymp n^{-1}\log n$ and sampling distribution $\cP_{\operatorname{samp}} = \cP_{\operatorname{ref}}$.
+    Under Assumptions~\labelcref{ass:id,ass:noise,ass:bounded} and Relative Overlap of degree $\gamma$, with probability at least $1 - n^{-10}$, the estimator $\hat{h}_\lambda$ satisfies:
+    \begin{align}\label{eq:main_bound}
+        \cE(\hat{h}_\lambda) \lesssim \underbrace{\lambda \|h^\star\|_\cH^2}_{\text{Bias}} + \underbrace{\frac{\Gamma(\lambda)}{\gamma n}}_{\text{Variance}} + \underbrace{\frac{\|f^\star\|_\cF^2}{\gamma n}}_{\text{Nuisance Error}}.
+    \end{align}
+    Consequently, optimizing $\lambda$ yields the following convergence rates in terms of the effective sample size $n_{\operatorname{eff}} = \gamma n$:
+    \begin{itemize}
+        \item \textbf{Case (a) (Polynomial):} $\lambda \asymp n_{\operatorname{eff}}^{-\frac{2\ell}{1+2\ell}} \implies  \cE(\hat{h}_\lambda) \lesssim n_{\operatorname{eff}}^{-\frac{2\ell}{1+2\ell}} + \frac{\|f^\star\|_\cF^2}{n_{\operatorname{eff}}}$.
+        \item \textbf{Case (b) (Exponential):} $\lambda \asymp \frac{1}{n_{\operatorname{eff}}} \implies \cE(\hat{h}_\lambda) \lesssim \frac{1}{n_{\operatorname{eff}}} + \frac{\|f^\star\|_\cF^2}{n_{\operatorname{eff}}}$.
+        \item \textbf{Case (c) (Finite Rank):} $\lambda \asymp \frac{D}{n_{\operatorname{eff}}} \implies \cE(\hat{h}_\lambda) \lesssim \frac{D}{n_{\operatorname{eff}}} + \frac{\|f^\star\|_\cF^2}{n_{\operatorname{eff}}}$.
+    \end{itemize}
+    The notation \(\lesssim\) hides constants and logarithmic factors.
+\end{theorem}
+We defer the proof to Appendix~\ref{section: apdx proof general theory}.
+The bound in \cref{eq:main_bound} highlights the primary strength of our method: the statistical error is governed by the complexity of the \emph{simpler} target space $\cH$ (via $\Gamma(\lambda)$) rather than the potentially complex nuisance space $\cF$. The complexity of the nuisance function $f^\star$ enters only as a parametric $O(1/\gamma n)$ term. Even if $\|f^\star\|_\cF$ is large (potentially growing with $n$), it does not degrade the convergence rate of the leading term, provided $n$ is sufficiently large.
+This structural decoupling facilitates fast rates for specific examples:
+
+\begin{example}[Sobolev Nuisance]
+    If $\cF = H^\beta(\cZ)$ and $\cH =  H^\beta(\cA)$ for \(\cZ \subset \RR^d, \cA \subset \RR\) with $\beta > d/2$, then Case (a) implies a rate of $\tilde{\cO}((\gamma n)^{-\frac{2\beta}{1+2\beta}})$. This is significantly faster than the rate for learning $f^\star$ directly, which would be $\cO(n^{-\frac{2\beta}{d+2\beta}})$.
+\end{example}
+
+\begin{example}[NTK Nuisance]
+    If $\cF$ corresponds to a Neural Tangent Kernel (modeling an overparameterized neural network) but $h^\star \in H^1(\cA)$ for some $\cA \subset \RR$ (a smooth dose-response), our method achieves the fast rate $\tilde{\cO}((\gamma n)^{-2/3})$ for the TEF, bypassing the slow learning rate associated with the high-dimensional NTK.
+\end{example}
+
+A distinguishing feature of our analysis is that it obviates the need for estimating the conditional treatment density (generalized propensity score) or achieving specific convergence rates for the nuisance estimator; we require only that the outcome model be well-specified.
+This result parallels the ``fast rate'' phenomenon---convergence faster than standard double machine learning rates---discussed in \citet{bonvini2022fast}.
+However, their theory is confined to Hölder spaces and relies on $L^\infty$ convergence of the nuisance estimation errors, which can be prohibitive in high-dimensional settings.
+In contrast, our method allows for flexible kernel choices and dispenses with sup-norm error bounds, thereby maintaining practical applicability.
+To the best of our knowledge, this is the first work to investigate fast convergence rates within the RKHS framework.
+%Notably, we are \textit{the first to establish fast rates for function classes that extend beyond the limitations of Hölder spaces.}
+
+Achieving the theoretical rates in Theorem~\ref{theorem; MISE} requires an optimal choice of the regularizer $\lambda$, which balances bias and variance.
+In practice, however, the optimal $\lambda$ depends on unknown structural properties: the smoothness of the true TEF $h^\star$, the spectral decay of the kernel, and the degree of overlap $\gamma$.
+To address this, we introduced a data-driven model selection procedure (Algorithm~\ref{algorithm: model selection}) in Section~\ref{subsection: model selection algorithm}.
+In the subsequent section, we establish the adaptivity guarantees of this procedure, demonstrating that it automatically achieves minimax-optimal rates without requiring prior knowledge of these structural parameters.
+
+
+\subsection{Adaptivity Guarantees}\label{section: model selection}
+
+We now demonstrate that Algorithm~\ref{algorithm: model selection} selects a main regularizer $\lambda$ that achieves minimax-optimal rates without requiring knowledge of the overlap $\gamma$ or kernel spectral decay.
+
+\begin{theorem}[Adaptivity of Model Selection]\label{theorem; model selection}
+    Suppose we run Algorithm~\ref{algorithm: model selection} with $M =n$, $\cP_{\operatorname{samp}} = \cP_{\operatorname{ref}}$ and a geometric grid \(
+\Lambda \coloneqq\{ \frac{2^{k-1} \log n}{n} : k = 1,\dotsc,L \},
+\) where $L = \lceil \log_2 n \rceil + 1$. Under the assumptions of Theorem~\ref{theorem; MISE}, with probability at least $1 - 2n^{-10}$, the selected estimator $\hat{h}_{\hat{\lambda}}$ satisfies the following:
+\begin{itemize}
+        \item \textbf{Case (a):} \quad \(\cE(\hat h_{\hat{\lambda}}) \lesssim \ (n_{\operatorname{eff}})^{-\frac{2\ell}{1+2\ell}} + \frac{1}{n_{\operatorname{eff}}} \|f^\star\|_\cF^2\);
+        \item \textbf{Case (b):}\quad \(\cE(\hat h_{\hat{\lambda}}) \lesssim  \frac{1}{n_{\operatorname{eff}}} (1+ \|f^\star\|_\cF^2)\);
+        \item \textbf{Case (c):} \quad  \(\cE(\hat h_{\hat{\lambda}}) \lesssim   \frac{D}{n_{\operatorname{eff}}} + \frac{\|f^\star\|_\cF^2}{n_{\operatorname{eff}}}.\)
+\end{itemize}
+The notation \(\lesssim\) hides constants and logarithmic factors.
+\end{theorem}
+The proof is provided in Appendix~\ref{section: apdx proof model selection}.
+Our analysis demonstrates that the proposed procedure automatically selects the optimal main regularizer for the second-stage KRR, achieving the minimax-optimal rates established in \Cref{theorem; MISE}.
+Crucially, the estimator $\hat{h}_{\hat{\lambda}}$ adapts to the unknown structural parameters—specifically the degree of overlap $\gamma$ and the spectral decay of the kernel integral operator—without requiring prior knowledge.
+This confirms the strong adaptivity of our framework: it effectively exploits the effective sample size $n_{\operatorname{eff}} = \gamma n$ and the intrinsic complexity of the target function $h^\star$, even when the nuisance function $f^\star$ is complex.
+
+
+
+\subsection{Minimax Lower Bound}\label{section: lower bound}
+
+We now establish that the dependence on the effective sample size $n_{\operatorname{eff}} = \gamma n$ is fundamental to the problem and cannot be improved.
+We derive the minimax lower bound for the Sobolev class $H^\beta([0,1])$.
+
+\begin{theorem}[Minimax Lower Bound]\label{theorem; lower bound}
+    Let $\cA = [0,1]$ and $\cZ = [0,1]^d$. Let $\cP(\gamma)$ denote the set of distributions satisfying Relative Overlap with degree $\gamma$ (w.r.t. uniform measure). For the Sobolev class $\cH = H^\beta(\cA)$, the minimax MISE with respect to the uniform measure satisfies:
+    \begin{align}
+        \inf_{\hat{h}} \sup_{\substack{\|f^\star\|_{\cF} \le 1 \\ \cP \in \cP(\gamma)}} \EE[\cE(\hat{h})] \gtrsim (\gamma n)^{-\frac{2\beta}{1+2\beta}} = n_{\operatorname{eff}}^{-\frac{2\beta}{1+2\beta}}.
+    \end{align}
+\end{theorem}
+The proof can be found in Appendix~\ref{section: apdx proof lower bound}. This lower bound matches our upper bound in Theorem~\ref{theorem; MISE} (Case (a)), confirming that our estimator is minimax-optimal with respect to both sample size $n$ and overlap parameter $\gamma$.
+
+\section{Experiments}\label{section:experiments}
+This section evaluates the proposed method using both synthetic data and a semi-real benchmark.
+Code and data-processing scripts will be made publicly available to facilitate reproducibility.
+
+\subsection{Synthetic Data}
+We validate the efficacy of our two-stage procedure through a synthetic experiment.
+Our approach decouples the estimation problem by first estimating the nuisance function $f^\star$ to construct pseudo-outcomes, followed by a second-stage KRR over the hypothesis space $\cH$.
+This second-stage smoothing is the primary distinction between our method and a standard plug-in KRR approach.
+
+\paragraph{Baselines.}
+We compare our proposed estimator against two primary baselines:
+(1) \textit{Plug-in KRR}: This approach estimates the nuisance function $f^\star$ via KRR to obtain $\hat{f}$, then computes the target effect through direct empirical marginalization, $\hat{h}(a) = \frac{1}{n} \sum_{i=1}^n \hat{f}(x_i, a)$, without a second smoothing stage.
+(2) \textit{Direct Regression}: This method performs KRR to regress $y$ directly on $a$, ignoring covariates $x$, thereby failing to adjust for confounding.
+
+\paragraph{Data Generating Process.}
+Let $x=(x^1,\ldots,x^q)\in\mathbb{R}^q$ denote a covariate vector with dimension $q=10$. We draw $n$ covariate vectors $x_i\stackrel{i.i.d.}{\sim}\mathcal{U}([-1,1]^q)$.
+We define an auxiliary function $s(x) := \frac{1}{q} \sum_{i=1}^q \sin(x^i)$ and set the true conditional mean function as:
+\[
+f^\star(x,a)=\sin(a) + 4 s(x)(\sin(a)+1).
+\]
+This specification yields the true TEF $h^\star(a)=\sin(a)$.
+To simulate confounding, we define a propensity score function $r(x) = \sigma(2 \sum_{i=1}^q x_i)$, where $\sigma(\cdot)$ denotes the sigmoid function. Conditional on $x$, treatment values are drawn via $u\sim\mathrm{Beta}(\alpha(x),\beta(x))$ with parameters $\alpha(x) = 20 r(x)$ and $\beta(x) = 20 (1-r(x))$. These values are mapped to the domain $\cA = [-\pi, \pi]$ via the transformation $a=\pi(2u-1)$.
+Observed outcomes are generated as $y_i = f^\star(x_i, a_i) + \varepsilon_i$, where $\varepsilon_i \sim \mathcal{N}(0,1)$. We evaluate performance across sample sizes $n\in\{500,1000\}$.
+
+\paragraph{Implementation Details.}
+For our proposed method (Algorithm~\ref{algorithm: model selection}), we partition the dataset into a training set $\cD_{\text{train}}$ and a validation set $\cD_{\text{val}}$, with sizes $n_1 = |\cD_{\text{train}}|$ and $n_2 = |\cD_{\text{val}}|$, respectively.
+The regularization grid is defined as $\Lambda = \{ c \frac{2^{k-1}}{n_1} : k = 1,\dots,9 \}$ with $c = 0.1$, and the proxy regularizer is fixed at $\tilde{\lambda} = c/n_2$.
+Treatment query points for pseudo-outcome construction are sampled uniformly.
+Regarding kernel specification, we employ a Mat\'ern kernel with smoothness parameter $\nu=1.5$ for the first-stage nuisance estimation ($f^\star$), and a smoother Mat\'ern kernel with $\nu=2.5$ for the second-stage target estimation ($h^\star$).
+
+For the \textit{Plug-in KRR} baseline, we adopt the same data splitting strategy and regularization grid $\Lambda$. The candidate models $\{\hat f_\lambda\}_{\lambda\in\Lambda}$ are trained on $\cD_{\text{train}}$ using KRR with regularizer \(\lambda\), and the final parameter is selected by minimizing the Mean Squared Error (MSE) on $\cD_{\text{val}}$.
+
+The \textit{Direct Regression} baseline is similarly implemented using KRR with a Mat\'ern kernel ($\nu=1.5$).
+We apply the same hold-out validation strategy: candidate estimators are trained on $\cD_{\text{train}}$ using regularization grid $\Lambda$, and the final parameter is selected by minimizing prediction error on $\cD_{\text{val}}$.
+
+For all methods, we construct a length‑scale grid by matching the kernel correlation at the median pairwise distance and cross‑validate over this grid, following the widely used median‑heuristic for kernel bandwidth selection \citep{garreau2017large,gretton2012kernel}.
+Specifically, let $r_{\mathrm{med}}$ denote the median pairwise distance. For each correlation level $\rho$ in a chosen set within $[0.15, 0.85]$, we define the candidate length-scale $\ell_\rho$ by solving $K(r_{\mathrm{med}};\ell_\rho)/K(0;\ell_\rho)=\rho$.
+We then cross-validate over the resulting grid $\{\ell_\rho\}$ to select the final $\ell$.
+In our proposed framework, the length-scale of the second-stage kernel $K_\cH$ is set equal to that of $K_\cF$.
+In this experiment, the selected length-scale parameter was $\ell = 3$ for our method and Plug-in KRR, and $\ell = 2$ for Direct Regression.
+
+\paragraph{Results.}
+Table~\ref{table:MISE_synthetic} presents the MISE averaged over $100$ independent runs.
+Our proposed method consistently outperforms both the Plug-in baseline and Direct Regression across both sample sizes, confirming the efficacy of the second-stage smoothing procedure.
+
+\begin{table}[h]
+    \centering
+    \caption{Comparison of MISE over 100 runs (standard error in parentheses) on synthetic data. Reported values are scaled by $100$.}
+    \label{table:MISE_synthetic}
+    \vspace{0.2cm}
+    \begin{tabular}{@{}lcc@{}}
+        \toprule
+        Method & $n=1000$ & $n=500$ \\
+        \midrule
+        \textbf{Ours}            & 6.22 (0.32)  & 8.40 (0.35)  \\
+        Plug-in                  & 9.87 (0.31)  & 11.81 (0.28) \\
+        Direct Regression        & 14.52 (0.31) & 14.84 (0.36) \\
+        \bottomrule
+    \end{tabular}
+\end{table}
+
+
+\subsection{Semi-real Data}
+We further evaluate our methodology on a semi-real benchmark derived from the Job Corps dataset.
+The Job Corps data is a well-established benchmark in the continuous treatment effect literature \citep{singh2024kernel,colangelo2025double}.
+Financed by the U.S. Department of Labor, the Job Corps program is the largest publicly funded job training initiative for disadvantaged youth in the United States.
+The data originates from the program's randomized evaluation period (November 1994 -- February 1996).
+While eligibility was randomized, the intensity of participation (treatment dosage) was self-selected. This makes it a canonical setting for continuous treatment effect estimation under the assumption of selection on observables.
+The relevant variables are defined as follows:
+\begin{itemize}
+    \item \textbf{Treatment ($a$):} Total hours spent in academic or vocational training classes during the first year after randomization.
+    \item \textbf{Outcome ($y$):} Labor market outcomes (e.g., proportion of weeks employed or earnings) measured in the second year after randomization.
+    \item \textbf{Covariates ($x$):} A rich 40-dimensional vector ($x \in \mathbb{R}^{40}$) capturing baseline characteristics, including age, gender, ethnicity, language competency, education, marital status, household size, household income, previous receipt of social aid, family background, and health-related behaviors.
+\end{itemize}
+
+\paragraph{Data Construction.}
+We construct a semi-real (semi-synthetic) data-generating process to enable evaluation against ground truth while preserving key structures of the real data.
+The primary objective of this construction is to establish a ground-truth treatment effect function $h^\star(a)$, allowing for precise quantitative evaluation against the true response surface.
+Let the original Job Corps samples be denoted by \(\{x_{\mathrm{job},i}, a_{\mathrm{job},i}, y_{\mathrm{job},i}\}_{i=1}^n\) with $n = 4024$.
+First, we fit a Generalized Random Forest (GRF) regressor \citep{athey2019generalized}, denoted as \(\hat f_{\mathrm{semi}}\), using the original inputs \(\{(x_{\mathrm{job},i}, a_{\mathrm{job},i})\}_{i=1}^n\) and outcomes \(\{y_{\mathrm{job},i}\}_{i=1}^n\).
+We then compute the residuals:
+\begin{align*}
+    g_i := y_{\mathrm{job},i} - \hat f_{\mathrm{semi}}(x_{\mathrm{job},i}, a_{\mathrm{job},i}).
+\end{align*}
+The semi-real dataset \(\tilde{\cD} = \{x_{\mathrm{job},i}, a_{\mathrm{job},i}, \tilde y_i\}_{i=1}^n\) is generated by injecting randomized noise into the fitted response:
+\begin{align*}
+    \tilde y_i = \hat f_{\mathrm{semi}}(x_{\mathrm{job},i}, a_{\mathrm{job},i}) + \tilde e_i g_i,
+\end{align*}
+where \(\{\tilde e_i\}_{i=1}^n\) are i.i.d.\ Rademacher random variables (taking values \(\{-1, 1\}\) with equal probability).
+We evaluate the estimation error on a fixed treatment grid \(\{160, 200, \dots, 2000\}\), following the protocol in \citet{colangelo2025double}, and report the MISE calculated over this grid.
+We define the true marginal dose-response curve $h^\star$ by averaging the fitted response surface $\hat{f}_{\mathrm{semi}}$ over the empirical distribution of the covariates:
+\begin{align*}
+    h^\star(a) := \frac{1}{n} \sum_{i=1}^n \hat{f}_{\mathrm{semi}}(x_{\mathrm{job},i}, a),
+\end{align*}
+for any treatment level $a \in \cA$. Consequently, the reported MISE measures the discrepancy between the estimated treatment effects and this ground truth $h^\star(a)$ on the evaluation grid.
+
+\paragraph{Baselines.}
+We compare our proposed method against three categories of baselines:
+\begin{enumerate}
+    \item \textbf{Plug-in KRR (LOOCV):} A direct KRR-based plug-in approach. The regularizers are selected via Leave-One-Out Cross-Validation (LOOCV), following \citet{singh2024kernel}.
+    \item \textbf{Double Machine Learning (DML):} We include the doubly robust estimators proposed by \citet{colangelo2025double}. These methods estimate the nuisance components (conditional outcome and conditional treatment density) using four distinct learners: Neural Networks (NN), Kernel Neural Networks (KNN), GRF, and LASSO. The final treatment effect curve is obtained via kernel smoothing on the generated pseudo-outcomes. We adopt the exact tuning parameters and bandwidths reported in \citet{colangelo2025double}.
+    \item \textbf{Direct Regression:} A naive baseline that performs KRR to regress \(y\) directly on \(a\), ignoring covariates. The regularizer is selected via LOOCV.
+\end{enumerate}
+
+\paragraph{Implementation Details.}
+For our method and the Plug-in baseline, inputs are normalized to \([0,1]^d\).
+We employ a tensor-product Laplace kernel (Mat\'ern kernel with smoothness $\nu=0.5$) for the nuisance estimation and a Mat\'ern kernel with smoothness $\nu=1.5$ for the second-stage KRR.
+The length-scale parameters for the nuisance kernel \(K_\cF\) were selected via cross-validation on a grid constructed around the median heuristic (similar to the synthetic experiments), resulting in \(\ell_x = 13\) (covariates) and \(\ell_a = 6000\) (treatment).
+For our proposed estimator, we set the second-stage kernel length-scale \(K_\cH\) equal to the treatment length-scale of \(K_\cF\) (i.e., \(\ell = 6000\)).
+We denote the sizes of the training and validation sets as $n_1 = |\cD_{\text{train}}|$ and $n_2 = |\cD_{\text{val}}|$, respectively.
+Consistent with the synthetic experiments, we define the regularization grid as $\Lambda = \{ c \frac{2^{k-1}}{n_1} : k = 1,\dots,9 \}$ with $c = 0.1$, and set the proxy regularizer to $\tilde{\lambda} = c/n_2$.
+The second-stage regression requires a sampling distribution \(\cP_{\operatorname{samp}}\); since approximately \(94\%\) of the observed treatments in the Job Corps data lie within \([0, 3000]\), we sample \(a\) uniformly from this range.
+To ensure computational efficiency during LOOCV, we employ the Nyström approximation with \(m = 700\) landmark points.
+Finally, consistent with \citet{colangelo2025double}, categorical covariates are one-hot encoded, and the DML baselines use the same standardization procedures as in the original study.
+
+\paragraph{Results.}
+Table~\ref{table:MISE_semi_real} summarizes the results over \(100\) independent runs. Our method achieves the lowest MISE compared to all baselines. Notably, even though the ground truth \(\hat f_{\mathrm{semi}}\) was constructed using GRF, our kernel-based approach outperforms the DML (GRF) baseline (1.24 vs 2.42), highlighting the effectiveness of our two-stage smoothing procedure in adapting to the structure of the treatment effect function.
+
+\begin{table}[t]
+    \centering
+    \caption{MISE (standard errors in parentheses) for the semi-real benchmark, averaged over $100$ independent runs. Our proposed method yields the lowest error among all compared baselines.}
+    \label{table:MISE_semi_real}
+    \vspace{0.2cm}
+    \begin{tabular}{lc}
+        \toprule
+        Method & Mean MISE (SE) \\
+        \midrule
+        \textbf{Ours}       & \textbf{1.2466 (0.1209)} \\
+        Plug-in LOOCV       & 1.6173 (0.1156) \\
+        Direct Regression   & 1.6970 (0.1264) \\
+        DML (GRF)           & 2.4230 (0.1837) \\
+        DML (NN)            & 2.1065 (0.1454) \\
+        DML (LASSO)         & 2.8732 (0.2391) \\
+        DML (KNN)           & 2.9742 (0.2165) \\
+        \bottomrule
+    \end{tabular}
+\end{table}
+
+
+\section{Conclusion}\label{section: conclusion}
+
+In this work, we have introduced a two-stage kernel ridge regression framework for estimating continuous treatment effects under confounding. Our primary theoretical contribution lies in demonstrating that the statistical complexity of estimating the TEF is governed by the complexity of the target function space $\cH$, rather than the potentially high-dimensional nuisance space $\cF$.
+By constructing pseudo-outcomes and then applying a second-stage smoother, our estimator achieves minimax-optimal convergence rates that adapt to both the intrinsic regularity of the TEF and the degree of overlap. Furthermore, we developed a fully data-driven model selection procedure that achieves these optimal rates without requiring prior knowledge of the structural parameters.
+
+Several promising directions remain for future research. First, our current approach is predicated on the assumption of a well-specified outcome model. To improve robustness against model misspecification, future work could investigate incorporating inverse propensity weighting or developing doubly-robust kernel estimators that guarantee consistency if either the outcome or treatment density model is correct.
+Second, while our analysis leverages the tractability of RKHS theory, extending this ``decoupling'' strategy to general function classes, such as neural networks beyond the NTK regime, represents an important step toward broader practical applicability.
+
+
+\clearpage
+\newpage
+{
+\bibliographystyle{ims}
+\bibliography{bib}
+}
+
+
+
+
+
+\clearpage
+\newpage
+\appendix
+\begin{center}
+\textbf{{\Huge Supplementary Materials}}
+\end{center}
+\vspace{0.5cm}
+\etocdepthtag.toc{mtappendix}
+\etocsettagdepth{mtchapter}{none}
+\etocsettagdepth{mtappendix}{subsection}
+{\tableofcontents}
+
+
+\input{appendix}
+
+
+
+\end{document}
