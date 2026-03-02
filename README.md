@@ -6,32 +6,32 @@ This repository contains code for the paper:
 *Optimal Estimation of Continuous Treatment Effects with Kernel Ridge Regression*
 
 The goal is to estimate the continuous treatment effect (dose-response) curve
-\[
+$$
 h(t) = \mathbb{E}[Y(t)]
-\]
+$$
 from observational data with confounding.
 
 ## Problem Setting
 
-With continuous treatment, direct regression of \(Y\) on \(T\) is generally biased because treatment assignment depends on covariates \(X\). The target is the population-averaged potential outcome curve \(h(t)\), not \(\mathbb{E}[Y \mid T=t]\).
+With continuous treatment, direct regression of $Y$ on $T$ is generally biased because treatment assignment depends on covariates $X$. The target is the population-averaged potential outcome curve $h(t)$, not $\mathbb{E}[Y \mid T=t]$.
 
 ## Method Summary (Two-Stage KRR)
 
 The proposed estimator in `CTE.tex` uses two-stage kernel ridge regression:
 
 1. **Stage 1 (nuisance model):** Fit
-   \[
+   $$
    f(x,t) \approx \mathbb{E}[Y \mid X=x, T=t]
-   \]
-   on the joint space \((X,T)\).
-2. **Stage 2 (target model):** Build pseudo-outcomes by averaging \(\hat f(X_i, t)\) over empirical covariates and fit a 1D KRR smoother for \(h(t)\).
+   $$
+   on the joint space $(X,T)$.
+2. **Stage 2 (target model):** Build pseudo-outcomes by averaging $\hat f(X_i, t)$ over empirical covariates and fit a 1D KRR smoother for $h(t)$.
 3. **Model selection:** Use a split-sample proxy-validation rule to select the second-stage regularizer.
 
 ## Theory Highlights (from `CTE.tex`)
 
 Under standard identification/noise/bounded-kernel assumptions:
 
-- The paper introduces **Relative Overlap** with degree \(\gamma\), and effective sample size \(n_{\mathrm{eff}} = \gamma n\).
+- The paper introduces **Relative Overlap** with degree $\gamma$, and effective sample size $n_{\mathrm{eff}} = \gamma n$.
 - The MISE bound decomposes into bias + variance + nuisance terms, where variance depends on the spectral complexity of the target RKHS.
 - The estimator is shown to be **minimax-optimal** (up to logs) in the studied regimes and adaptive to unknown overlap/spectral decay via the data-driven tuning rule.
 
@@ -117,13 +117,13 @@ Open and run:
 
 ### Synthetic setup (paper-aligned)
 
-- Ours / Plug-in: joint kernel on \((X,T)\), then evaluate MISE on a fixed treatment grid.
+- Ours / Plug-in: joint kernel on $(X,T)$, then evaluate MISE on a fixed treatment grid.
 - Direct baseline: T-only KRR (ignores covariates).
 
 ### Semi-real setup (Job Corps)
 
-- Ours / Plug-in first stage: tensor-product Laplace kernel (Matérn \(\nu=0.5\)).
-- Ours second stage: Matérn kernel with \(\nu=1.5\).
+- Ours / Plug-in first stage: tensor-product Laplace kernel (Matérn $\nu=0.5$).
+- Ours second stage: Matérn kernel with $\nu=1.5$.
 - Direct baseline (code default): T-only Laplace KRR with `ell_t = 3000`, Nyström `m = 700`, and LOOCV for ridge selection.
 
 ## Reported Results Snapshot (from `CTE.tex`)
@@ -159,4 +159,3 @@ If you use this repository, please cite the paper. Placeholder BibTeX:
   note   = {Manuscript}
 }
 ```
-
