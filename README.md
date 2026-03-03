@@ -131,14 +131,3 @@ Open and run:
 | DML (LASSO) | 2.8732 (0.2391) |
 | DML (KNN) | 2.9742 (0.2165) | -->
 
-## Citation
-
-If you use this repository, please cite the paper. Placeholder BibTeX:
-
-```bibtex
-@misc{kim_wang_cte_krr,
-  title  = {Optimal Estimation of Continuous Treatment Effects with Kernel Ridge Regression},
-  author = {Kim, Seok-Jin and Wang, Kaizheng},
-  note   = {Manuscript}
-}
-```
