@@ -9,7 +9,7 @@ The goal is to estimate the continuous treatment effect (dose-response) curve $h
 
 ## Problem Setting
 
-With continuous treatment, direct regression of $Y$ on $T$ is generally biased because treatment assignment depends on covariates $X$. The target is the population-averaged potential outcome curve $h(t)$, not $\mathbb{E}[Y \mid T=t]$.
+Given $n$ observational samples $\{(x_i, a_i, y_i)\}_{i=1}^n$ (covariates, continuous treatment, outcome), the goal is to estimate the population dose-response curve $h(a)=\mathbb{E}[Y(a)]$. Since treatment assignment $a_i$ depends on $x_i$, naive regression of $y_i$ on $a_i$ targets $\mathbb{E}[Y \mid A=a]$ and is generally biased for $h(a)$.
 
 ## Method Summary (Two-Stage KRR)
 
@@ -100,8 +100,10 @@ Open and run:
 
 ### Synthetic setup (paper-aligned)
 
-- Ours / Plug-in: joint kernel on $(X,T)$, then evaluate MISE on a fixed treatment grid.
-- Direct baseline: T-only KRR (ignores covariates).
+- `ours`: proposed two-stage KRR estimator.
+- `plugin`: plug-in estimator based on the first-stage fit.
+- `direct` (Direct Regression): T-only KRR baseline that ignores covariates.
+- In synthetic experiments, all three methods use Matérn-kernel KRR and are evaluated on the same fixed treatment grid for MISE.
 
 ### Semi-real setup (Job Corps)
 
@@ -130,4 +132,3 @@ Open and run:
 | DML (NN) | 2.1065 (0.1454) |
 | DML (LASSO) | 2.8732 (0.2391) |
 | DML (KNN) | 2.9742 (0.2165) | -->
-
