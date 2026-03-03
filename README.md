@@ -5,11 +5,7 @@ This repository contains code for the paper:
 **Seok-Jin Kim, Kaizheng Wang**  
 *Optimal Estimation of Continuous Treatment Effects with Kernel Ridge Regression*
 
-The goal is to estimate the continuous treatment effect (dose-response) curve
-$$
-h(t) = \mathbb{E}[Y(t)]
-$$
-from observational data with confounding.
+The goal is to estimate the continuous treatment effect (dose-response) curve $h(t) = \mathbb{E}[Y(t)]$ from observational data with confounding.
 
 ## Problem Setting
 
@@ -19,11 +15,7 @@ With continuous treatment, direct regression of $Y$ on $T$ is generally biased b
 
 The proposed estimator uses two-stage kernel ridge regression:
 
-1. **Stage 1 (nuisance model):** Fit
-   $$
-   f(x,t) \approx \mathbb{E}[Y \mid X=x, T=t]
-   $$
-   on the joint space $(X,T)$.
+1. **Stage 1 (nuisance model):** Fit $f(x,t) \approx \mathbb{E}[Y \mid X=x, T=t]$ on the joint space $(X,T)$.
 2. **Stage 2 (target model):** Build pseudo-outcomes by averaging $\hat f(X_i, t)$ over empirical covariates and fit a 1D KRR smoother for $h(t)$.
 3. **Model selection:** Use a split-sample proxy-validation rule to select the second-stage regularizer.
 
