@@ -126,7 +126,7 @@ Open and run:
 - Ours second stage: Matérn kernel with $\nu=1.5$.
 - Direct baseline (code default): T-only Laplace KRR with `ell_t = 3000`, Nyström `m = 700`, and LOOCV for ridge selection.
 
-## Reported Results Snapshot (from `CTE.tex`)
+<!-- ## Reported Results Snapshot
 
 ### Synthetic (MISE x 100, mean with SE)
 
@@ -146,7 +146,7 @@ Open and run:
 | DML (GRF) | 2.4230 (0.1837) |
 | DML (NN) | 2.1065 (0.1454) |
 | DML (LASSO) | 2.8732 (0.2391) |
-| DML (KNN) | 2.9742 (0.2165) |
+| DML (KNN) | 2.9742 (0.2165) | -->
 
 ## Citation
 
