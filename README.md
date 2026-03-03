@@ -27,13 +27,6 @@ The proposed estimator in `CTE.tex` uses two-stage kernel ridge regression:
 2. **Stage 2 (target model):** Build pseudo-outcomes by averaging $\hat f(X_i, t)$ over empirical covariates and fit a 1D KRR smoother for $h(t)$.
 3. **Model selection:** Use a split-sample proxy-validation rule to select the second-stage regularizer.
 
-## Theory Highlights (from `CTE.tex`)
-
-Under standard identification/noise/bounded-kernel assumptions:
-
-- The paper introduces **Relative Overlap** with degree $\gamma$, and effective sample size $n_{\mathrm{eff}} = \gamma n$.
-- The MISE bound decomposes into bias + variance + nuisance terms, where variance depends on the spectral complexity of the target RKHS.
-- The estimator is shown to be **minimax-optimal** (up to logs) in the studied regimes and adaptive to unknown overlap/spectral decay via the data-driven tuning rule.
 
 ## Repository Layout
 
