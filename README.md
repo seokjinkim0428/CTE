@@ -9,7 +9,7 @@ The goal is to estimate the continuous treatment effect (dose-response) curve $h
 
 ## Problem Setting
 
-Given $n$ observational samples $\{(x_i, a_i, y_i)\}_{i=1}^n$ (covariates, continuous treatment, outcome), the goal is to estimate the population dose-response curve $h(a)=\mathbb{E}[Y(a)]$. Since treatment assignment $a_i$ depends on $x_i$, naive regression of $y_i$ on $a_i$ targets $\mathbb{E}[Y \mid A=a]$ and is generally biased for $h(a)$.
+Given $n$ observational samples $\{(x_i, t_i, y_i)\}_{i=1}^n$ (covariates, continuous treatment, outcome), the goal is to estimate the population dose-response curve $h(t)=\mathbb{E}_x[Y(t)]$. Since treatment assignment $t_i$ depends on $x_i$, naive regression of $y_i$ on $t_i$ targets $\mathbb{E}[Y \mid T=t]$ and is generally biased for $h(t)$.
 
 ## Method Summary (Two-Stage KRR)
 
