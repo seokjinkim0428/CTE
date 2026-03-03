@@ -17,7 +17,7 @@ With continuous treatment, direct regression of $Y$ on $T$ is generally biased b
 
 ## Method Summary (Two-Stage KRR)
 
-The proposed estimator in `CTE.tex` uses two-stage kernel ridge regression:
+The proposed estimator uses two-stage kernel ridge regression:
 
 1. **Stage 1 (nuisance model):** Fit
    $$
@@ -30,8 +30,6 @@ The proposed estimator in `CTE.tex` uses two-stage kernel ridge regression:
 
 ## Repository Layout
 
-- `CTE.tex`  
-  Paper source (method, theory, experiments).
 - `Demo_synthetic.ipynb`  
   Main synthetic benchmark runner (`ours` / `plugin` / `direct`).
 - `Demo_semi-real.ipynb`  
