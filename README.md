@@ -109,7 +109,7 @@ Open and run:
 
 - Ours / Plug-in first stage: tensor-product Laplace kernel (Matérn $\nu=0.5$).
 - Ours second stage: Matérn kernel with $\nu=1.5$.
-- Direct baseline (code default): T-only Laplace KRR with `ell_t = 3000`, Nyström `m = 700`, and LOOCV for ridge selection.
+- Direct baseline: 1D KRR with a Laplace kernel.
 
 <!-- ## Reported Results Snapshot
 

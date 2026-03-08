@@ -1,4 +1,4 @@
-# cte_jobcorps/data_jobcorps.py
+# KRR_methods/data_jobcorps.py
 from __future__ import annotations
 
 import pathlib

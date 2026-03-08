@@ -1,4 +1,4 @@
-# cte_jobcorps/kernels.py
+# KRR_methods/kernels.py
 from __future__ import annotations
 
 import numpy as np

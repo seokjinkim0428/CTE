@@ -1,4 +1,4 @@
-# cte_jobcorps/algorithms/estimators_plugin.py
+# KRR_methods/algorithms/estimators_plugin.py
 from __future__ import annotations
 
 from typing import List, Dict, Any

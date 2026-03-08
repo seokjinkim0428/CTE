@@ -1,4 +1,4 @@
-# cte_jobcorps/algorithms/length_selection.py
+# KRR_methods/algorithms/length_selection.py
 from __future__ import annotations
 
 from typing import Dict
