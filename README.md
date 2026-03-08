@@ -1,9 +1,9 @@
-# Optimal Estimation of Continuous Treatment Effects with Kernel Ridge Regression
+# Estimating Continuous Treatment Effects with Two-Stage Kernel Ridge Regression
 
 This repository contains code for the paper:
 
 **Seok-Jin Kim, Kaizheng Wang**  
-*Optimal Estimation of Continuous Treatment Effects with Kernel Ridge Regression*
+*Estimating Continuous Treatment Effects with Two-Stage Kernel Ridge Regression*
 
 The goal is to estimate the continuous treatment effect (dose-response) curve $h(t) = \mathbb{E}[Y(t)]$ from observational data with confounding.
 
